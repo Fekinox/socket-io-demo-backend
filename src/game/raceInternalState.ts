@@ -1,13 +1,26 @@
 import { Horse } from "./horse/horse.js"
-import { RACE_DURATION } from "./race.js"
+import { RACE_DURATION, Race } from "./race.js"
+import { SERVER_TICK_RATE_MS } from "./serverState.js"
 
 export class RaceInternalState {
     horseStates: Array<HorseState> = []
     rankings: Array<number> = []
+    time: number = 0
+
+    constructor(race?: Race) {
+        if (race) {
+            this.horseStates = race.horses.map((h) => new HorseState(h))
+            this.rankings = Array.from(
+                {length: this.horseStates.length},
+                (_, i) => i)
+        }
+    }
 
     nextState(): RaceInternalState {
         let next = new RaceInternalState()        
+        next.time = this.time + SERVER_TICK_RATE_MS 
         next.horseStates = this.horseStates.map((hs) => {
+            if (hs.finishTime !== null) { return hs }
             let nextHs = new HorseState(hs.horse)
             nextHs.currentSpeed = 
                 Math.max(hs.currentSpeed + hs.horse.acceleration,
@@ -15,26 +28,45 @@ export class RaceInternalState {
             nextHs.position = hs.position + hs.currentSpeed
             if (nextHs.position > RACE_DURATION) {
                 nextHs.position = RACE_DURATION
-                nextHs.finished = true
+                nextHs.finishTime = next.time
             }
 
             return nextHs
         })
+        next.rankings = Array.from(
+            {length: this.horseStates.length},
+            (_, i) => i)
         next.recomputeRankings()
+         
         return next
     }
 
     recomputeRankings() {
         this.rankings.sort((idxI, idxJ) => {
+            const horseI = this.horseStates[idxI]
+            const horseJ = this.horseStates[idxJ]
             const posDifference = 
-                this.horseStates[idxI].position - this.horseStates[idxJ].position
-            if (posDifference > 0.01) { return posDifference }
-            else { return idxI - idxJ }
+                horseI.position - horseJ.position
+            if (Math.abs(posDifference) > 0.01) {
+                return posDifference
+            } else if (horseI.finishTime !== null && horseJ.finishTime !== null) {
+                if (Math.abs(horseI.finishTime - horseJ.finishTime) > 0) {
+                    return horseI.finishTime - horseJ.finishTime
+                } else {
+                    return idxI - idxJ
+                }
+            } else if (horseI.finishTime !== null) {
+                return -1
+            } else if (horseJ.finishTime !== null) {
+                return 1
+            } else {
+                return idxI - idxJ
+            }
         })
     }
 
     raceOver() {
-        this.horseStates.every((hs) => hs.finished)
+        return this.horseStates.every((hs) => hs.finishTime !== null)
     }
 }
 
@@ -42,7 +74,8 @@ export class HorseState {
     horse: Horse 
     position: number = 0
     currentSpeed: number = 0
-    finished: boolean = false
+    finishTime: number | null = null
+
     constructor(horse: Horse) {
         this.horse = horse
     }
