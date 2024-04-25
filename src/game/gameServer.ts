@@ -4,7 +4,7 @@ import { ClientInfo } from "../clientInfo.js"
 import { GameDatabase } from "./gameDatabase.js"
 import { hrTimeMs } from "../time.js"
 import { Race } from './race.js'
-import { RaceInternalState } from './raceInternalState.js'
+import { RaceState } from './raceState.js'
 
 export const SERVER_TICK_RATE_MS = 100
 
@@ -25,7 +25,7 @@ export class GameServer {
     preRaceTimer: number = 0
     resultsTimer: number = 0
 
-    raceStates: Array<RaceInternalState> | null = null
+    raceStates: Array<RaceState> | null = null
 
     constructor(db: GameDatabase, server: HTTPServer) {
         this.io = new SocketIOServer(server, {
@@ -110,7 +110,7 @@ export class GameServer {
         this.status = 'race'
         this.preRaceTimer = PRERACE_DELAY * 1000
         if (this.race === null) { throw new Error('no race') }
-        this.raceStates = [new RaceInternalState(this.race)]
+        this.raceStates = [new RaceState(this.race)]
     }
 
     startResultsMode() {

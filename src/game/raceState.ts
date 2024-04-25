@@ -1,8 +1,8 @@
 import { Horse } from "./horse/horse.js"
 import { RACE_DURATION, Race } from "./race.js"
-import { SERVER_TICK_RATE_MS } from "./serverState.js"
+import { SERVER_TICK_RATE_MS } from "./gameServer.js"
 
-export class RaceInternalState {
+export class RaceState {
     horseStates: Array<HorseState> = []
     rankings: Array<number> = []
     time: number = 0
@@ -16,8 +16,8 @@ export class RaceInternalState {
         }
     }
 
-    nextState(): RaceInternalState {
-        let next = new RaceInternalState()        
+    nextState(): RaceState {
+        let next = new RaceState()        
         next.time = this.time + SERVER_TICK_RATE_MS 
         next.horseStates = this.horseStates.map((hs) => {
             if (hs.finishTime !== null) { return hs }
