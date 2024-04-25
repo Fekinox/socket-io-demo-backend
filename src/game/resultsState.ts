@@ -1,6 +1,6 @@
-import { GameState } from "./serverState.js";
+import { ServerMode } from "./serverState.js";
 
-export class ResultsState implements GameState {
+export class ResultsState implements ServerMode {
     update(): void {
     }
 }

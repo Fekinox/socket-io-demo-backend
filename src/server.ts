@@ -1,20 +1,16 @@
 import express from 'express'
 import { createServer } from 'node:http'
 import { Server, Socket } from 'socket.io'
-import { SERVER_TICK_RATE_MS, ServerState } from './game/serverState.js'
+import { SERVER_TICK_RATE_MS, GameServer } from './game/serverState.js'
 import { GameDatabase } from './game/gameDatabase.js'
-
-function hrTimeMs(): bigint {
-    const raw = process.hrtime.bigint()
-    return raw/1000000n
-}
+import { hrTimeMs } from './time.js'
 
 let lag = 0n
 let prevTime = hrTimeMs()
 
 let db = GameDatabase.create()
 
-let serverState = new ServerState(db)
+let serverState = new GameServer(db)
 
 const app = express()
 const server = createServer(app)

@@ -5,14 +5,14 @@ import { GameDatabase } from "./gameDatabase.js"
 
 export const SERVER_TICK_RATE_MS = 100
 
-export interface GameState {
+export interface ServerMode {
     update(): void
 }
 
-export class ServerState {
+export class GameServer {
     clients: Map<string, ClientInfo>
     messages: Array<string>
-    data: GameState
+    data: ServerMode
 
     constructor(db: GameDatabase) {
         this.clients = new Map()
