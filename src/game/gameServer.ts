@@ -14,20 +14,41 @@ export const RESULTS_DELAY = 10
 
 /** The base server for the game. */
 export class GameServer {
+    /** Internal Socket.IO server. */
     io: SocketIOServer
+    /** Reference to the game database. */
     db: GameDatabase
+    /** Map between the Socket.IO ids of each client and a container
+    *   for their client info */
     clients: Map<string, ClientInfo>
+
     messages: Array<string>
 
+    lag: bigint = 0n
+    prevTime: bigint = hrTimeMs()
+
+    /** The current race, if it exists. */
     race: Race | null = null
-    status: 'betting' | 'race' | 'results'
+    /** Current server status.
+    * Betting - Race is visible to all players. Players may send 'bet' actions
+    * to indicate that they will bet a certain amount on a horse to win.
+    * Race - Race is being simulated.
+    * Results - Race has finished, and the game server will simply display
+    * the finished status. */
+    status: 'betting' | 'race' | 'results' = 'betting'
+
+    /** Timer that ticks down to zero in betting mode before a race begins. */
     bettingTimer: number = 0
+    /** Timer that ticks down to zero in race mode before a race begins. */
     preRaceTimer: number = 0
+    /** Timer that ticks down to zero in results mode before a new round begins. */
     resultsTimer: number = 0
 
+    /** Array of all race states */
     raceStates: Array<RaceState> | null = null
 
     constructor(db: GameDatabase, server: HTTPServer) {
+        // Create a new Socket.IO server using the given HTTP connection.
         this.io = new SocketIOServer(server, {
             cors: {
                 credentials: true,
@@ -43,27 +64,29 @@ export class GameServer {
 
         this.clients = new Map()
         this.messages = []
-        const race = db.createRace()
 
-        if (race === null) { throw new Error('could not create race') }
-
-        this.status = 'betting'
-        this.race = race
-
+        // For each client that connects to the server, set up the corresponding
+        // event listeners.
         this.io.on('connection', (socket: Socket) => {
             console.log('a user connected')
             console.log(socket)
 
+            // Initially clients are unauthenticated. Clients may authenticate
+            // themselves by sending a 'login' message to the server.
             this.clients.set(socket.id, {
                 socket: socket,
                 authed: false,
                 username: ''
             })
 
-            socket.onAny((evt) => console.log(evt))
+            // Log all events as they come in.
+            socket.onAny((evt, ...args) => console.log(evt, args))
 
+            // Client attempted to login.
             socket.on('login', ({ username }, cb) => {
                 let clientInfo = this.clients.get(socket.id)
+                // If client doesn't exist somehow, inform client that
+                // their info isn't in the list of clients in the server.
                 if (clientInfo === undefined) {
                     cb({
                         message: 'not in client listing'
@@ -72,13 +95,13 @@ export class GameServer {
                 }
                 clientInfo.authed = true
                 clientInfo.username = username
+                // Inform user that authentication was successful
                 cb({
                     message: 'ok'
                 })
-
-                console.log(this.clients)
             })
 
+            // Client attempted to logout.
             socket.on('logout', () => {
                 let clientInfo = this.clients.get(socket.id)
                 if (clientInfo === undefined) { return }
@@ -86,10 +109,12 @@ export class GameServer {
                 clientInfo.username = ''
             })
 
+            // Client closed the connection.
             socket.on('disconnect', () => {
                 this.clients.delete(socket.id)
             })
 
+            // Client sent an action to the server.
             socket.on('action', (payload) => {
                 this.handleAction(payload)
             })
@@ -205,20 +230,24 @@ export class GameServer {
         }
     }
 
+    // Start the main server loop.
     mainLoop() {
-        let lag = 0n
-        let prevTime = hrTimeMs()
-
+        this.prevTime = hrTimeMs()
         const runner = () => {
             setTimeout(runner, SERVER_TICK_RATE_MS/4)
+            // Some amount of time passed between the current and previous
+            // calls to `runner`, so compute that and add it to lag.
             const now = hrTimeMs()
-            lag += now - prevTime
-            prevTime = now
-            while (lag > SERVER_TICK_RATE_MS) {
+            this.lag += now - this.prevTime
+            this.prevTime = now
+            // While the server is still behind by at least the tick rate,
+            // iteratively update the server and reduce the lag.
+            // Additionally pass the current lag 
+            while (this.lag > SERVER_TICK_RATE_MS) {
                 this.handleTick()
-                this.emitState(lag)
-                console.log(lag - BigInt(SERVER_TICK_RATE_MS))
-                lag -= BigInt(SERVER_TICK_RATE_MS)
+                this.emitState(this.lag)
+                console.log(this.lag - BigInt(SERVER_TICK_RATE_MS))
+                this.lag -= BigInt(SERVER_TICK_RATE_MS)
             }
         }
 
