@@ -23,7 +23,7 @@ export class RaceInternalState {
             if (hs.finishTime !== null) { return hs }
             let nextHs = new HorseState(hs.horse)
             nextHs.currentSpeed = 
-                Math.max(hs.currentSpeed + hs.horse.acceleration,
+                Math.min(hs.currentSpeed + hs.horse.acceleration,
                          hs.horse.topSpeed)
             nextHs.position = hs.position + hs.currentSpeed
             if (nextHs.position > RACE_DURATION) {

@@ -156,6 +156,7 @@ export class GameServer {
                 this.resultsTimer -= SERVER_TICK_RATE_MS
                 return
             }
+            // start a new race if we're autorestarting
             break;
         }
     }
